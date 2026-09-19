@@ -1,94 +1,88 @@
 # ProcureFlow
 
-ProcureFlow is a technical-assessment implementation of an enterprise-style Purchase-to-Pay workflow:
+ProcureFlow is a role-based Purchase-to-Pay application covering the workflow from purchase request through approval, purchase order, delivery, and completion.
 
-**Purchase Request -> Approval -> Purchase Order -> Delivery -> Completion**
+```text
+Draft -> Submitted -> Approved -> PO Created -> Delivered -> Completed
+                     
+                     -> Rejected
+```
 
-## Technology
+This is a monorepo containing a React single-page application, a .NET Web API, PostgreSQL persistence, automated backend tests, and Azure deployment workflows.
 
-### Frontend
-React, TypeScript, Vite, Material UI, Redux Toolkit, RTK Query, React Router, React Hook Form and Zod.
+## Components
 
-### Backend
-.NET 8 ASP.NET Core Web API, Controller -> Service -> Repository architecture, Entity Framework Core Code First, PostgreSQL, ASP.NET Core Identity + JWT, AutoMapper, FluentValidation and Swagger.
+| Component | Purpose | Primary technology | Documentation |
+|---|---|---|---|
+| Frontend | Role-aware web interface | React, TypeScript, Vite, Material UI, Redux Toolkit | [frontend/README.md](frontend/README.md) |
+| Backend | Authentication, API, and workflow rules | .NET 8, ASP.NET Core, EF Core, Identity, JWT | [backend/README.md](backend/README.md) |
+| Database | Transactional persistence | PostgreSQL 16 | [backend/README.md](backend/README.md#local-database) |
+| Deployment | Static frontend and hosted API | Azure Static Web Apps and Azure App Service | [Frontend](frontend/README.md#deployment) / [Backend](backend/README.md#cors) |
+
+## Product capabilities
+
+- JWT authentication for Requester, Approver, and Admin roles.
+- Purchase-request creation, editing, deletion, submission, details, and status history.
+- Approval and rejection workflows.
+- Purchase-order creation from approved requests.
+- Delivery recording and completion.
+- Dashboard workflow totals.
+- Server-side search, filtering, sorting, and pagination.
+- Responsive light/dark user interface with notifications and loading states.
+- Backend-enforced authorization, ownership, validation, and workflow transitions.
+
+## Architecture overview
+
+```text
+React + RTK Query
+       |
+       | HTTPS / JSON / JWT
+       v
+ASP.NET Core Controllers
+       v
+Application Services
+       v
+Repositories + EF Core
+       v
+PostgreSQL
+```
+
+The frontend and backend are built and deployed independently. Frontend route guards improve the user experience, while the API remains the security boundary.
 
 ## Repository layout
 
 ```text
 ProcureFlow/
-  frontend/
+  .github/workflows/       Azure deployment workflows
   backend/
     ProcureFlow.sln
+    README.md              Backend setup and API reference
     src/
-      ProcureFlow.API/
-      ProcureFlow.Application/
-      ProcureFlow.Domain/
-      ProcureFlow.Infrastructure/
     tests/
+  frontend/
+    README.md              Frontend setup and implementation guide
+    src/
   docs/
   docker-compose.yml
 ```
 
-## Demo users
+## Quick start
 
-All demo accounts use password: `Demo@123`
+Requirements: .NET 8 SDK, Node.js 20 or a supported LTS release, npm, and Docker Desktop or PostgreSQL 16.
 
-- `requester@procureflow.demo` - Requester
-- `approver@procureflow.demo` - Approver
-- `admin@procureflow.demo` - Admin
-
-These credentials are strictly for local assessment/demo use.
-
-## 1. Start PostgreSQL
-
-The simplest option is Docker:
+Start PostgreSQL from the repository root:
 
 ```bash
 docker compose up -d postgres
 ```
 
-Default local database settings are already present in `backend/src/ProcureFlow.API/appsettings.json`.
-
-## 2. Backend setup in Visual Studio 2022
-
-Requirements:
-- Visual Studio 2022 with ASP.NET/web workload
-- .NET 8 SDK
-- PostgreSQL 16 or Docker Desktop
-
-Open:
-
-```text
-backend/ProcureFlow.sln
-```
-
-Set `ProcureFlow.API` as startup project.
-
-### Recommended: create the initial EF migration
-
-From a terminal at repository root:
+Start the API:
 
 ```bash
-dotnet tool install --global dotnet-ef
-dotnet ef migrations add InitialCreate --project backend/src/ProcureFlow.Infrastructure --startup-project backend/src/ProcureFlow.API --output-dir Persistence/Migrations
-dotnet ef database update --project backend/src/ProcureFlow.Infrastructure --startup-project backend/src/ProcureFlow.API
+dotnet run --project backend/src/ProcureFlow.API/ProcureFlow.API.csproj
 ```
 
-For convenience, if there are no migrations yet the included startup seeder uses `EnsureCreated` so the app can still be run immediately. Once you create `InitialCreate`, EF migrations become the normal Code First path.
-
-Run the API. With the supplied launch settings it uses:
-
-```text
-http://localhost:5080
-```
-
-Swagger (Development):
-
-```text
-http://localhost:5080/swagger
-```
-
-## 3. Frontend setup in VS Code
+Start the frontend in another terminal:
 
 ```bash
 cd frontend
@@ -97,120 +91,74 @@ cp .env.example .env
 npm run dev
 ```
 
+PowerShell users can replace the copy command with:
+
+```powershell
+Copy-Item .env.example .env
+```
+
 Open:
 
-```text
-http://localhost:5173
+- Frontend: `http://localhost:5173`
+- Swagger: `http://localhost:5080/swagger`
+
+For database configuration, migrations, CORS, authentication, and API contracts, use the [backend guide](backend/README.md). For frontend environment variables, routes, state, and production builds, use the [frontend guide](frontend/README.md).
+
+## Demo workflow
+
+Local seed accounts use the password `Demo@123`:
+
+| Email | Role |
+|---|---|
+| `requester@procureflow.demo` | Requester |
+| `approver@procureflow.demo` | Approver |
+| `admin@procureflow.demo` | Admin |
+
+Typical flow:
+
+1. Requester creates and submits a Draft purchase request.
+2. Approver approves or rejects the Submitted request.
+3. Admin creates a PO from an Approved request.
+4. Admin records delivery and completes the PO.
+
+These credentials are for local/demo use only.
+
+## Build and test
+
+Backend:
+
+```bash
+dotnet build backend/ProcureFlow.sln
+dotnet test backend/ProcureFlow.sln
 ```
 
-`VITE_API_URL` defaults to `http://localhost:5080/api` only while running Vite in development mode. Production builds must supply the deployed API URL; the Azure Static Web Apps workflow reads it from the `VITE_API_URL` repository variable and falls back to `https://procureflow-api.azurewebsites.net/api`.
+Frontend:
 
-## Business workflow
-
-### Requester
-1. Login as Requester.
-2. Create a Purchase Request in Draft.
-3. Edit/delete while Draft.
-4. Submit for approval.
-
-### Approver
-1. Login as Approver.
-2. Open Pending Approvals.
-3. Approve or reject a Submitted PR.
-
-### Admin
-1. Login as Admin.
-2. Create a PO from an Approved PR.
-3. Mark the PO Delivered.
-4. Complete the transaction.
-
-Backend services enforce all workflow transitions and role rules.
-
-## Statuses
-
-Purchase Request:
-- Draft
-- Submitted
-- Approved
-- Rejected
-- POCreated
-- Delivered
-- Completed
-
-Purchase Order:
-- Created
-- Delivered
-- Completed
-
-Delivery:
-- Pending
-- Delivered
-- Completed
-
-## Main APIs
-
-```text
-POST /api/auth/login
-GET  /api/auth/me
-
-GET    /api/purchase-requests
-GET    /api/purchase-requests/{id}
-POST   /api/purchase-requests
-PUT    /api/purchase-requests/{id}
-DELETE /api/purchase-requests/{id}
-POST   /api/purchase-requests/{id}/submit
-
-GET  /api/approvals
-POST /api/approvals/{id}/approve
-POST /api/approvals/{id}/reject
-
-GET  /api/purchase-orders
-GET  /api/purchase-orders/{id}
-POST /api/purchase-orders
-
-POST /api/deliveries/{poId}/deliver
-POST /api/deliveries/{poId}/complete
-
-GET /api/dashboard/summary
-GET /api/departments
-GET /api/categories
-GET /api/vendors
+```bash
+cd frontend
+npm install
+npm run build
 ```
 
-## Search and pagination
+The current backend suite contains eight workflow unit tests and one integration-project smoke test. Frontend automated tests are not yet configured. Component-specific warnings and limitations are documented in the respective READMEs.
 
-Purchase Request list supports parameters including:
+## Deployment overview
 
-```text
-?pageNumber=1&pageSize=10&search=laptop&status=Submitted&sortBy=createdAt&sortDirection=desc
-```
+- `.github/workflows/azure-static-web-apps-white-field-0fd17a610.yml` builds and deploys the frontend.
+- `.github/workflows/main_procureflow-api.yml` publishes and deploys the API.
+- `VITE_API_URL` is embedded into the frontend during its production build.
+- Backend connection strings, JWT settings, and allowed frontend origins must be configured through Azure App Service settings or another secret store.
 
-## Important implementation notes
+See [frontend deployment](frontend/README.md#deployment) and [backend configuration/CORS](backend/README.md#cors) for the component-specific requirements.
 
-- Individual repositories are used rather than a generic repository.
-- Business rules are kept in services, not controllers or repositories.
-- Workflow status changes are action endpoints rather than arbitrary status updates.
-- PR -> PO and PO -> Delivery relationships are one-to-zero/one and protected by unique database indexes.
-- UTC timestamps are used on the server.
-- JWT role claims drive backend authorization and role-aware frontend navigation.
+## Documentation ownership
 
-## Testing
+To avoid duplicated and conflicting instructions:
 
-Test projects are included under `backend/tests`. They are intentionally lightweight starting points. For the assessment, add focused tests around invalid workflow transitions and authorization, especially:
-
-- Draft can submit.
-- Submitted cannot be edited.
-- Draft cannot be approved.
-- Submitted can approve/reject.
-- Rejected cannot create PO.
-- Approved can create exactly one PO.
-- Delivery requires an existing Created PO.
-- Completion requires Delivered status.
+- This root README contains only the product overview, repository entry point, and cross-component workflow.
+- `backend/README.md` owns backend architecture, database setup, migrations, authentication, API reference, tests, backend decisions, and backend limitations.
+- `frontend/README.md` owns frontend setup, environment variables, routes, state, forms, grids, build/deployment behavior, frontend decisions, and frontend limitations.
 
 ## AI-assisted development disclosure
 
-This project is structured for AI-assisted development. ChatGPT/Codex/GitHub Copilot may be used for scaffolding, implementation assistance, debugging, testing and documentation. Architecture and implementation decisions should be reviewed and understood by the candidate before submission.
-
-## Current scaffold scope
-
-This ZIP provides the full agreed architecture and a runnable core feature implementation for authentication, Purchase Requests, approvals, Purchase Orders, delivery/completion, dashboard summary, master data, role-aware React navigation, search and basic pagination. It is intended to be opened and continued in Visual Studio 2022 and VS Code for assessment polish, expanded tests and deployment work.
+ChatGPT, Codex, or GitHub Copilot may have been used for scaffolding, implementation assistance, debugging, testing, and documentation. Maintainers should review and understand architecture, security, and implementation decisions before production use.
