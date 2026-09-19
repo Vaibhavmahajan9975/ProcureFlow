@@ -10,8 +10,15 @@ import type {
   PurchaseRequestDetails,
   PurchaseRequestInput,
 } from "../types";
+const apiBaseUrl = import.meta.env.VITE_API_URL?.trim() ||
+  (import.meta.env.DEV ? "http://localhost:5080/api" : "");
+
+if (!apiBaseUrl) {
+  throw new Error("VITE_API_URL must be configured for production builds.");
+}
+
 const raw = fetchBaseQuery({
-  baseUrl: import.meta.env.VITE_API_URL ?? "http://localhost:5080/api",
+  baseUrl: apiBaseUrl,
   prepareHeaders: (h, { getState }) => {
     const t = (getState() as RootState).auth.user?.token;
     if (t) h.set("authorization", `Bearer ${t}`);

@@ -103,7 +103,7 @@ Open:
 http://localhost:5173
 ```
 
-`VITE_API_URL` defaults to `http://localhost:5080/api` if no environment file is supplied.
+`VITE_API_URL` defaults to `http://localhost:5080/api` only while running Vite in development mode. Production builds must supply the deployed API URL; the Azure Static Web Apps workflow reads it from the `VITE_API_URL` repository variable and falls back to `https://procureflow-api.azurewebsites.net/api`.
 
 ## Business workflow
 
