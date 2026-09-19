@@ -10,7 +10,8 @@ public class MappingProfile : Profile
             .ForMember(d=>d.RequesterName,o=>o.MapFrom(s=>s.Requester.FullName))
             .ForMember(d=>d.DepartmentName,o=>o.MapFrom(s=>s.Department.Name))
             .ForMember(d=>d.VendorName,o=>o.MapFrom(s=>s.Vendor.Name))
-            .ForMember(d=>d.CategoryName,o=>o.MapFrom(s=>s.Category.Name));
+            .ForMember(d=>d.CategoryName,o=>o.MapFrom(s=>s.Category.Name))
+            .ForMember(d=>d.LastActivityAt,o=>o.MapFrom(s=>s.StatusHistory.Any()?s.StatusHistory.Max(h=>h.ChangedAt):(s.UpdatedAt??s.CreatedAt)));
             CreateMap<PurchaseRequest, PurchaseRequestDetailsDto>()
                 .IncludeBase<PurchaseRequest, PurchaseRequestDto>()
                 .ForMember(d => d.SubmittedAt, o => o.MapFrom(s => s.SubmittedAt))

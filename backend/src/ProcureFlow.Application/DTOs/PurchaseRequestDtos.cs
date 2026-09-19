@@ -28,6 +28,8 @@ public class PurchaseRequestDto
     public DateOnly RequiredDate { get; set; }
     public PurchaseRequestStatus Status { get; set; }
     public DateTime CreatedAt { get; set; }
+    public DateTime? UpdatedAt { get; set; }
+    public DateTime LastActivityAt { get; set; }
     public string? RejectionReason { get; set; }
 }
 public class PurchaseOrderSummaryDto

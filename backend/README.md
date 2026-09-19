@@ -289,6 +289,12 @@ GET /api/purchase-requests?pageNumber=1&pageSize=10&search=laptop&status=Submitt
 
 Requesters receive only their own records. Other authenticated roles are not restricted by requester ID.
 
+Each purchase-request list item includes:
+
+- `createdAt`: original creation time.
+- `updatedAt`: most recent general entity update when available.
+- `lastActivityAt`: latest `StatusHistory.ChangedAt`, falling back to `updatedAt` and then `createdAt`. Dashboard recent activity should use this field instead of treating creation time as the time of the current status.
+
 #### `GET /api/purchase-requests/{id}`
 
 Returns base PR fields plus submission/approval/rejection data, status history, purchase-order summary, and delivery summary when present. Requesters can access only owned requests.
@@ -427,9 +433,10 @@ The integration test project currently contains only a project-wiring smoke test
 
 - Workflow mutations are explicit action endpoints.
 - Conditional repository updates prevent stale concurrent transitions.
+- Every PR status transition writes an immutable status-history row with `ChangedAt`; atomic transitions also maintain `UpdatedAt` and `UpdatedBy` on affected PR, PO, and delivery records.
 - Unique indexes enforce PR number, PO number, one PO per PR, and one delivery per PO constraints.
 - Amount columns use PostgreSQL precision `numeric(18,2)`.
-- Entity timestamps are set in the DbContext using UTC.
+- Entity and workflow timestamps are recorded in UTC. Tracked changes are stamped by the DbContext, while direct atomic updates set their audit fields explicitly.
 - Requester ownership is enforced in the application service.
 - Error details and stack traces are not exposed to clients.
 

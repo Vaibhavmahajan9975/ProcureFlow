@@ -31,7 +31,7 @@ public class PurchaseRequestRepository(ProcureFlowDbContext db) : IPurchaseReque
         var newStatus = PurchaseRequestStatus.Submitted.ToString();
         var draftStatus = PurchaseRequestStatus.Draft.ToString();
         var submittedAt = DateTime.UtcNow;
-        var rows = await db.Database.ExecuteSqlInterpolatedAsync($"UPDATE \"PurchaseRequests\" SET \"Status\" = {newStatus}, \"SubmittedAt\" = {submittedAt} WHERE \"Id\" = {id} AND \"Status\" = {draftStatus}", ct);
+        var rows = await db.Database.ExecuteSqlInterpolatedAsync($"UPDATE \"PurchaseRequests\" SET \"Status\" = {newStatus}, \"SubmittedAt\" = {submittedAt}, \"UpdatedAt\" = {submittedAt}, \"UpdatedBy\" = {changedById} WHERE \"Id\" = {id} AND \"Status\" = {draftStatus}", ct);
         if (rows == 0)
         {
             await tx.RollbackAsync(ct);
@@ -50,7 +50,7 @@ public class PurchaseRequestRepository(ProcureFlowDbContext db) : IPurchaseReque
         var approvedAt = DateTime.UtcNow;
         var approvedStatus = PurchaseRequestStatus.Approved.ToString();
         var submittedStatus = PurchaseRequestStatus.Submitted.ToString();
-        var rows = await db.Database.ExecuteSqlInterpolatedAsync($"UPDATE \"PurchaseRequests\" SET \"Status\" = {approvedStatus}, \"ApprovedAt\" = {approvedAt}, \"ApprovedById\" = {approverId} WHERE \"Id\" = {id} AND \"Status\" = {submittedStatus}", ct);
+        var rows = await db.Database.ExecuteSqlInterpolatedAsync($"UPDATE \"PurchaseRequests\" SET \"Status\" = {approvedStatus}, \"ApprovedAt\" = {approvedAt}, \"ApprovedById\" = {approverId}, \"UpdatedAt\" = {approvedAt}, \"UpdatedBy\" = {approverId} WHERE \"Id\" = {id} AND \"Status\" = {submittedStatus}", ct);
         if (rows == 0)
         {
             await tx.RollbackAsync(ct);
@@ -69,7 +69,7 @@ public class PurchaseRequestRepository(ProcureFlowDbContext db) : IPurchaseReque
         var rejectedAt = DateTime.UtcNow;
         var rejectedStatus = PurchaseRequestStatus.Rejected.ToString();
         var submittedStatus = PurchaseRequestStatus.Submitted.ToString();
-        var rows = await db.Database.ExecuteSqlInterpolatedAsync($"UPDATE \"PurchaseRequests\" SET \"Status\" = {rejectedStatus}, \"RejectedAt\" = {rejectedAt}, \"RejectedById\" = {approverId}, \"RejectionReason\" = {reason} WHERE \"Id\" = {id} AND \"Status\" = {submittedStatus}", ct);
+        var rows = await db.Database.ExecuteSqlInterpolatedAsync($"UPDATE \"PurchaseRequests\" SET \"Status\" = {rejectedStatus}, \"RejectedAt\" = {rejectedAt}, \"RejectedById\" = {approverId}, \"RejectionReason\" = {reason}, \"UpdatedAt\" = {rejectedAt}, \"UpdatedBy\" = {approverId} WHERE \"Id\" = {id} AND \"Status\" = {submittedStatus}", ct);
         if (rows == 0)
         {
             await tx.RollbackAsync(ct);
@@ -115,7 +115,8 @@ public class PurchaseOrderRepository(ProcureFlowDbContext db) : IPurchaseOrderRe
         // Atomically set PR status to POCreated only when PR is Approved and no PO exists for it
         var newStatus = PurchaseRequestStatus.POCreated.ToString();
         var approvedStatus = PurchaseRequestStatus.Approved.ToString();
-        var rows = await db.Database.ExecuteSqlRawAsync("UPDATE \"PurchaseRequests\" SET \"Status\" = {0} WHERE \"Id\" = {1} AND \"Status\" = {2} AND NOT EXISTS (SELECT 1 FROM \"PurchaseOrders\" WHERE \"PurchaseRequestId\" = {1})", newStatus, purchaseRequestId, approvedStatus);
+        var changedAt = DateTime.UtcNow;
+        var rows = await db.Database.ExecuteSqlRawAsync("UPDATE \"PurchaseRequests\" SET \"Status\" = {0}, \"UpdatedAt\" = {1}, \"UpdatedBy\" = {2} WHERE \"Id\" = {3} AND \"Status\" = {4} AND NOT EXISTS (SELECT 1 FROM \"PurchaseOrders\" WHERE \"PurchaseRequestId\" = {3})", newStatus, changedAt, createdBy, purchaseRequestId, approvedStatus);
         if (rows == 0)
         {
             await tx.RollbackAsync(ct);
@@ -124,11 +125,11 @@ public class PurchaseOrderRepository(ProcureFlowDbContext db) : IPurchaseOrderRe
 
         // Create PO (PONumber uses current count; small chance of race on PONumber but OK for now)
         var count = await db.PurchaseOrders.CountAsync(ct) + 1;
-        var po = new PurchaseOrder { Id = Guid.NewGuid(), PurchaseRequestId = purchaseRequestId, PONumber = $"PO-{DateTime.UtcNow:yyyy}-{count:00000}", OrderDate = DateOnly.FromDateTime(DateTime.UtcNow), TotalAmount = totalAmount, Currency = currency, Status = PurchaseOrderStatus.Created, CreatedAt = DateTime.UtcNow, CreatedBy = createdBy };
+        var po = new PurchaseOrder { Id = Guid.NewGuid(), PurchaseRequestId = purchaseRequestId, PONumber = $"PO-{changedAt:yyyy}-{count:00000}", OrderDate = DateOnly.FromDateTime(changedAt), TotalAmount = totalAmount, Currency = currency, Status = PurchaseOrderStatus.Created, CreatedAt = changedAt, CreatedBy = createdBy };
         await db.PurchaseOrders.AddAsync(po, ct);
 
         // Insert history (from Approved -> POCreated)
-        var history = new PurchaseRequestStatusHistory { Id = Guid.NewGuid(), PurchaseRequestId = purchaseRequestId, FromStatus = PurchaseRequestStatus.Approved, ToStatus = PurchaseRequestStatus.POCreated, ChangedById = createdBy, ChangedAt = DateTime.UtcNow, Comment = "Purchase order created", CreatedAt = DateTime.UtcNow };
+        var history = new PurchaseRequestStatusHistory { Id = Guid.NewGuid(), PurchaseRequestId = purchaseRequestId, FromStatus = PurchaseRequestStatus.Approved, ToStatus = PurchaseRequestStatus.POCreated, ChangedById = createdBy, ChangedAt = changedAt, Comment = "Purchase order created", CreatedAt = changedAt };
         await db.PurchaseRequestStatusHistories.AddAsync(history, ct);
 
         try
@@ -156,13 +157,17 @@ public class DeliveryRepository(ProcureFlowDbContext db) : IDeliveryRepository
     public async Task<bool> TryMarkDeliveredAsync(Guid purchaseOrderId, DateOnly deliveryDate, string? notes, string changedById, CancellationToken ct = default)
     {
         await using var tx = await db.Database.BeginTransactionAsync(System.Data.IsolationLevel.ReadCommitted, ct);
+        var deliveredAt = DateTime.UtcNow;
 
         // Ensure PO exists and is in Created state
         var poId = purchaseOrderId;
         // Use ExecuteUpdateAsync to perform a conditional update without loading entities into change tracker
         var rows = await db.PurchaseOrders
             .Where(x => x.Id == poId && x.Status == PurchaseOrderStatus.Created)
-            .ExecuteUpdateAsync(s => s.SetProperty(p => p.Status, p => PurchaseOrderStatus.Delivered), ct);
+            .ExecuteUpdateAsync(s => s
+                .SetProperty(p => p.Status, p => PurchaseOrderStatus.Delivered)
+                .SetProperty(p => p.UpdatedAt, p => deliveredAt)
+                .SetProperty(p => p.UpdatedBy, p => changedById), ct);
         if (rows == 0)
         {
             await tx.RollbackAsync(ct);
@@ -182,7 +187,10 @@ public class DeliveryRepository(ProcureFlowDbContext db) : IDeliveryRepository
         var toStatus = PurchaseRequestStatus.Delivered.ToString();
         var prRows = await db.PurchaseRequests
             .Where(x => x.Id == prId && x.Status == PurchaseRequestStatus.POCreated)
-            .ExecuteUpdateAsync(s => s.SetProperty(p => p.Status, p => PurchaseRequestStatus.Delivered), ct);
+            .ExecuteUpdateAsync(s => s
+                .SetProperty(p => p.Status, p => PurchaseRequestStatus.Delivered)
+                .SetProperty(p => p.UpdatedAt, p => deliveredAt)
+                .SetProperty(p => p.UpdatedBy, p => changedById), ct);
         if (prRows == 0)
         {
             await tx.RollbackAsync(ct);
@@ -190,7 +198,6 @@ public class DeliveryRepository(ProcureFlowDbContext db) : IDeliveryRepository
         }
 
         // Insert Delivery record
-        var deliveredAt = DateTime.UtcNow;
         var delivery = new Delivery { Id = Guid.NewGuid(), PurchaseOrderId = poId, DeliveryDate = deliveryDate, Notes = notes, Status = DeliveryStatus.Delivered, CreatedAt = deliveredAt, CreatedBy = changedById };
         await db.Deliveries.AddAsync(delivery, ct);
 
@@ -214,13 +221,17 @@ public class DeliveryRepository(ProcureFlowDbContext db) : IDeliveryRepository
     public async Task<bool> TryCompleteAsync(Guid purchaseOrderId, string changedById, CancellationToken ct = default)
     {
         await using var tx = await db.Database.BeginTransactionAsync(System.Data.IsolationLevel.ReadCommitted, ct);
+        var completedAt = DateTime.UtcNow;
 
         var poId = purchaseOrderId;
 
         // Atomically set PO status to Completed if it's currently Delivered
         var rows = await db.PurchaseOrders
             .Where(x => x.Id == poId && x.Status == PurchaseOrderStatus.Delivered)
-            .ExecuteUpdateAsync(s => s.SetProperty(p => p.Status, p => PurchaseOrderStatus.Completed), ct);
+            .ExecuteUpdateAsync(s => s
+                .SetProperty(p => p.Status, p => PurchaseOrderStatus.Completed)
+                .SetProperty(p => p.UpdatedAt, p => completedAt)
+                .SetProperty(p => p.UpdatedBy, p => changedById), ct);
         if (rows == 0)
         {
             await tx.RollbackAsync(ct);
@@ -230,7 +241,10 @@ public class DeliveryRepository(ProcureFlowDbContext db) : IDeliveryRepository
         // Update Delivery status from Delivered -> Completed
         var deliveryRows = await db.Deliveries
             .Where(d => d.PurchaseOrderId == poId && d.Status == DeliveryStatus.Delivered)
-            .ExecuteUpdateAsync(s => s.SetProperty(d => d.Status, d => DeliveryStatus.Completed), ct);
+            .ExecuteUpdateAsync(s => s
+                .SetProperty(d => d.Status, d => DeliveryStatus.Completed)
+                .SetProperty(d => d.UpdatedAt, d => completedAt)
+                .SetProperty(d => d.UpdatedBy, d => changedById), ct);
         if (deliveryRows == 0)
         {
             await tx.RollbackAsync(ct);
@@ -248,7 +262,10 @@ public class DeliveryRepository(ProcureFlowDbContext db) : IDeliveryRepository
         // Update PR status from Delivered -> Completed
         var prRows = await db.PurchaseRequests
             .Where(x => x.Id == prId && x.Status == PurchaseRequestStatus.Delivered)
-            .ExecuteUpdateAsync(s => s.SetProperty(p => p.Status, p => PurchaseRequestStatus.Completed), ct);
+            .ExecuteUpdateAsync(s => s
+                .SetProperty(p => p.Status, p => PurchaseRequestStatus.Completed)
+                .SetProperty(p => p.UpdatedAt, p => completedAt)
+                .SetProperty(p => p.UpdatedBy, p => changedById), ct);
         if (prRows == 0)
         {
             await tx.RollbackAsync(ct);
@@ -256,7 +273,6 @@ public class DeliveryRepository(ProcureFlowDbContext db) : IDeliveryRepository
         }
 
         // Insert PR status history
-        var completedAt = DateTime.UtcNow;
         var history = new PurchaseRequestStatusHistory { Id = Guid.NewGuid(), PurchaseRequestId = prId, FromStatus = PurchaseRequestStatus.Delivered, ToStatus = PurchaseRequestStatus.Completed, ChangedById = changedById, ChangedAt = completedAt, Comment = "Transaction completed", CreatedAt = completedAt };
         await db.PurchaseRequestStatusHistories.AddAsync(history, ct);
 

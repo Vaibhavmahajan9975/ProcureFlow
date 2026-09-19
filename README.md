@@ -26,7 +26,7 @@ This is a monorepo containing a React single-page application, a .NET Web API, P
 - Approval and rejection workflows.
 - Purchase-order creation from approved requests.
 - Delivery recording and completion.
-- Dashboard workflow totals.
+- Responsive dashboard with workflow totals, status distribution, six-month PR/PO trends, role-specific work queues, recent requests, and timestamped recent activity.
 - Server-side search, filtering, sorting, and pagination.
 - Responsive light/dark user interface with notifications and loading states.
 - Backend-enforced authorization, ownership, validation, and workflow transitions.

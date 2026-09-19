@@ -20,7 +20,7 @@ The ProcureFlow frontend is a responsive React and TypeScript single-page applic
 - Role-aware navigation and protected routes.
 - Responsive/collapsible navigation shell.
 - Light and dark themes persisted in browser storage.
-- Dashboard workflow metrics.
+- Responsive dashboard with workflow totals, PR status distribution, six-month PR/PO trends, role-specific work queues, recent requests, and recent status activity.
 - Server-side purchase-request pagination, search, status filtering, and amount/created-date sorting.
 - Purchase-request create/edit dialogs, Draft-only delete, submission, details, history, PO summary, and delivery summary.
 - Pending approval search, approval, and validated rejection dialog.
@@ -187,6 +187,8 @@ The project retains MUI X Data Grid Community rather than AG Grid to avoid unnec
 
 RTK Query tags include `PR`, `Approval`, `PO`, and `Dashboard`. Mutations invalidate related tags so affected screens refetch automatically. Individual PR detail queries use entity IDs in their cache tags.
 
+The dashboard derives its status chart from `/dashboard/summary` and loads up to 100 recent PRs and POs from the existing list endpoints. Monthly PR bars use `createdAt`; monthly PO bars use `orderDate`. Recent Activity uses the backend-provided `lastActivityAt`, which represents the latest PR status-history timestamp and falls back to the record update or creation timestamp.
+
 ## Theme and reusable UI
 
 - Theme preference is saved under `procureflow_color_mode`.
@@ -231,6 +233,7 @@ It deploys `frontend/dist` to Azure Static Web Apps. The backend must allow the 
 - Server-side list operations avoid fetching a large client-side dataset.
 - Dialog-based create/edit actions preserve list context; direct routes remain available.
 - Material UI theme customization provides compact responsive density and dark mode.
+- Lightweight CSS charts avoid adding a charting dependency for the current dashboard requirements.
 - Backend roles and ownership are never assumed to be secured by hidden UI controls.
 
 ## Known limitations
@@ -242,5 +245,7 @@ It deploys `frontend/dist` to Azure Static Web Apps. The backend must allow the 
 - Client-side “today” validation uses the browser clock, while the backend uses UTC; near midnight, the backend remains authoritative.
 - Approved-PR selection during PO creation retrieves up to 50 records rather than providing an independently paginated lookup.
 - The application bundle currently exceeds Vite’s default 500 kB chunk advisory; route-level lazy loading/manual chunks are not configured.
+- Dashboard trend calculations use at most the latest 100 PRs and POs because they currently reuse the paged list APIs; a dedicated aggregate endpoint is required for exact trends beyond that volume.
+- Recent Activity shows the latest known state change per PR rather than a complete cross-entity event stream.
 - No offline support or service worker is configured.
 - Accessibility has not been independently audited.
