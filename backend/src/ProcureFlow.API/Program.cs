@@ -16,17 +16,32 @@ using ProcureFlow.Infrastructure.Identity;
 using ProcureFlow.Infrastructure.Persistence;
 using ProcureFlow.Infrastructure.Repositories;
 using System.Text;
-var builder=WebApplication.CreateBuilder(args);
-builder.Services.AddDbContext<ProcureFlowDbContext>(o=>o.UseNpgsql(builder.Configuration.GetConnectionString("DefaultConnection")));
-builder.Services.AddIdentityCore<ApplicationUser>(o=>{o.Password.RequiredLength=8;o.User.RequireUniqueEmail=true;}).AddRoles<IdentityRole>().AddEntityFrameworkStores<ProcureFlowDbContext>().AddSignInManager();
-var jwtKey=builder.Configuration["Jwt:Key"] ?? throw new InvalidOperationException("Jwt:Key missing"); builder.Services.AddAuthentication(JwtBearerDefaults.AuthenticationScheme).AddJwtBearer(o=>{o.TokenValidationParameters=new(){ValidateIssuer=true,ValidateAudience=true,ValidateLifetime=true,ValidateIssuerSigningKey=true,ValidIssuer=builder.Configuration["Jwt:Issuer"],ValidAudience=builder.Configuration["Jwt:Audience"],IssuerSigningKey=new SymmetricSecurityKey(Encoding.UTF8.GetBytes(jwtKey))};}); builder.Services.AddAuthorization();
+var builder = WebApplication.CreateBuilder(args);
+builder.Services.AddDbContext<ProcureFlowDbContext>(o => o.UseNpgsql(builder.Configuration.GetConnectionString("DefaultConnection")));
+builder.Services.AddIdentityCore<ApplicationUser>(o => { o.Password.RequiredLength = 8; o.User.RequireUniqueEmail = true; }).AddRoles<IdentityRole>().AddEntityFrameworkStores<ProcureFlowDbContext>().AddSignInManager();
+var jwtKey = builder.Configuration["Jwt:Key"] ?? throw new InvalidOperationException("Jwt:Key missing"); builder.Services.AddAuthentication(JwtBearerDefaults.AuthenticationScheme).AddJwtBearer(o => { o.TokenValidationParameters = new() { ValidateIssuer = true, ValidateAudience = true, ValidateLifetime = true, ValidateIssuerSigningKey = true, ValidIssuer = builder.Configuration["Jwt:Issuer"], ValidAudience = builder.Configuration["Jwt:Audience"], IssuerSigningKey = new SymmetricSecurityKey(Encoding.UTF8.GetBytes(jwtKey)) }; }); builder.Services.AddAuthorization();
 builder.Services.AddControllers(); builder.Services.AddFluentValidationAutoValidation(); builder.Services.AddValidatorsFromAssemblyContaining<CreatePurchaseRequestValidator>(); builder.Services.AddAutoMapper(typeof(MappingProfile)); builder.Services.AddHttpContextAccessor();
-builder.Services.AddScoped<ICurrentUserService,CurrentUserService>(); builder.Services.AddScoped<IAuthService,AuthService>(); builder.Services.AddScoped<IPurchaseRequestRepository,PurchaseRequestRepository>(); builder.Services.AddScoped<IPurchaseOrderRepository,PurchaseOrderRepository>(); builder.Services.AddScoped<IDeliveryRepository,DeliveryRepository>(); builder.Services.AddScoped<IMasterDataRepository,MasterDataRepository>(); builder.Services.AddScoped<IPurchaseRequestService,PurchaseRequestService>(); builder.Services.AddScoped<IApprovalService,ApprovalService>(); builder.Services.AddScoped<IPurchaseOrderService,PurchaseOrderService>(); builder.Services.AddScoped<IDeliveryService,DeliveryService>(); builder.Services.AddScoped<IDashboardService,DashboardService>(); builder.Services.AddScoped<IMasterDataService,MasterDataService>();
-builder.Services.AddCors(o=>o.AddPolicy("frontend",p=>p.WithOrigins(builder.Configuration["FrontendUrl"] ?? "http://localhost:5173").AllowAnyHeader().AllowAnyMethod()));
-builder.Services.AddEndpointsApiExplorer(); builder.Services.AddSwaggerGen(c=>{c.SwaggerDoc("v1",new(){Title="ProcureFlow API",Version="v1"}); c.AddSecurityDefinition("Bearer",new(){Name="Authorization",Type=SecuritySchemeType.Http,Scheme="bearer",BearerFormat="JWT",In=ParameterLocation.Header}); c.AddSecurityRequirement(new(){[new OpenApiSecurityScheme{Reference=new(){Type=ReferenceType.SecurityScheme,Id="Bearer"}}]=Array.Empty<string>()});});
-var app=builder.Build(); app.UseMiddleware<ExceptionMiddleware>(); app.UseSwagger();app.UseSwaggerUI(); app.UseCors("frontend"); app.UseAuthentication(); app.UseAuthorization(); app.MapControllers();
+builder.Services.AddScoped<ICurrentUserService, CurrentUserService>(); builder.Services.AddScoped<IAuthService, AuthService>(); builder.Services.AddScoped<IPurchaseRequestRepository, PurchaseRequestRepository>(); builder.Services.AddScoped<IPurchaseOrderRepository, PurchaseOrderRepository>(); builder.Services.AddScoped<IDeliveryRepository, DeliveryRepository>(); builder.Services.AddScoped<IMasterDataRepository, MasterDataRepository>(); builder.Services.AddScoped<IPurchaseRequestService, PurchaseRequestService>(); builder.Services.AddScoped<IApprovalService, ApprovalService>(); builder.Services.AddScoped<IPurchaseOrderService, PurchaseOrderService>(); builder.Services.AddScoped<IDeliveryService, DeliveryService>(); builder.Services.AddScoped<IDashboardService, DashboardService>(); builder.Services.AddScoped<IMasterDataService, MasterDataService>();
+var allowedOrigins = builder.Configuration
+    .GetSection("AllowedOrigins")
+    .Get<string[]>()
+    ?? new[] { "http://localhost:5173" };
+
+builder.Services.AddCors(options =>
+{
+    options.AddPolicy("frontend", policy =>
+    {
+        policy
+            .WithOrigins(allowedOrigins)
+            .AllowAnyHeader()
+            .AllowAnyMethod();
+    });
+});
+builder.Services.AddEndpointsApiExplorer(); builder.Services.AddSwaggerGen(c => { c.SwaggerDoc("v1", new() { Title = "ProcureFlow API", Version = "v1" }); c.AddSecurityDefinition("Bearer", new() { Name = "Authorization", Type = SecuritySchemeType.Http, Scheme = "bearer", BearerFormat = "JWT", In = ParameterLocation.Header }); c.AddSecurityRequirement(new() { [new OpenApiSecurityScheme { Reference = new() { Type = ReferenceType.SecurityScheme, Id = "Bearer" } }] = Array.Empty<string>() }); });
+var app = builder.Build(); app.UseMiddleware<ExceptionMiddleware>(); app.UseSwagger(); app.UseSwaggerUI(); app.UseCors("frontend"); app.UseAuthentication(); app.UseAuthorization(); app.MapControllers();
 app.MapGet("/", () => Results.Ok(new
 {
     message = "ProcureFlow API is running"
 }));
-using (var scope=app.Services.CreateScope()){var db=scope.ServiceProvider.GetRequiredService<ProcureFlowDbContext>(); var um=scope.ServiceProvider.GetRequiredService<UserManager<ApplicationUser>>(); var rm=scope.ServiceProvider.GetRequiredService<RoleManager<IdentityRole>>(); await SeedData.SeedAsync(db,um,rm);} app.Run(); public partial class Program { }
+using (var scope = app.Services.CreateScope()) { var db = scope.ServiceProvider.GetRequiredService<ProcureFlowDbContext>(); var um = scope.ServiceProvider.GetRequiredService<UserManager<ApplicationUser>>(); var rm = scope.ServiceProvider.GetRequiredService<RoleManager<IdentityRole>>(); await SeedData.SeedAsync(db, um, rm); }
+app.Run(); public partial class Program { }

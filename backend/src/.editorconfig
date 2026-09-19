@@ -1,0 +1,53 @@
+root = true
+
+[*]
+charset = utf-8
+end_of_line = crlf
+insert_final_newline = true
+trim_trailing_whitespace = true
+max_line_length = 120
+indent_style = space
+indent_size = 4
+
+[*.{cs,csx}]
+# Organize usings
+dotnet_sort_system_directives_first = true
+dotnet_separate_import_directive_groups = true
+
+# Qualification preferences
+dotnet_style_qualification_for_field = false:suggestion
+dotnet_style_qualification_for_property = false:suggestion
+dotnet_style_qualification_for_method = false:suggestion
+dotnet_style_qualification_for_event = false:suggestion
+
+# var preferences
+csharp_style_var_for_built_in_types = false:suggestion
+csharp_style_var_when_type_is_apparent = false:suggestion
+csharp_style_var_elsewhere = false:suggestion
+
+# New line preferences - open brace on new line for readability
+csharp_new_line_before_open_brace_for_types = true
+csharp_new_line_before_open_brace_for_methods = true
+csharp_new_line_before_open_brace_for_properties = true
+csharp_new_line_before_open_brace_for_accessors = true
+csharp_new_line_before_open_brace_for_anonymous_methods = true
+csharp_new_line_before_open_brace_for_control_blocks = true
+csharp_new_line_before_open_brace_for_anonymous_types = true
+csharp_new_line_before_open_brace_for_object_collection_array_initializers = true
+csharp_new_line_before_open_brace_for_lambda_expression_body = true
+
+# Keep code expanded (avoid single-line blocks)
+csharp_preserve_single_line_statements = false
+csharp_preserve_single_line_blocks = false
+
+# Spacing preferences
+csharp_space_after_keywords_in_control_flow_statements = true
+csharp_space_between_method_declaration_parameter_list_parentheses = false
+csharp_space_between_method_call_parameter_list_parentheses = false
+
+# Formatting severity
+dotnet_analyzer_diagnostic.severity = suggestion
+
+# Treat files in scripts and tests with slightly relaxed rules
+[*.Tests.cs]
+max_line_length = 180
