@@ -1,0 +1,28 @@
+using FluentValidation;
+using FluentValidation.AspNetCore;
+using Microsoft.AspNetCore.Authentication.JwtBearer;
+using Microsoft.AspNetCore.Identity;
+using Microsoft.EntityFrameworkCore;
+using Microsoft.IdentityModel.Tokens;
+using Microsoft.OpenApi.Models;
+using ProcureFlow.API.Middleware;
+using ProcureFlow.API.Services;
+using ProcureFlow.Application.Interfaces;
+using ProcureFlow.Application.Mapping;
+using ProcureFlow.Application.Services;
+using ProcureFlow.Application.Validators;
+using ProcureFlow.Domain.Entities;
+using ProcureFlow.Infrastructure.Identity;
+using ProcureFlow.Infrastructure.Persistence;
+using ProcureFlow.Infrastructure.Repositories;
+using System.Text;
+var builder=WebApplication.CreateBuilder(args);
+builder.Services.AddDbContext<ProcureFlowDbContext>(o=>o.UseNpgsql(builder.Configuration.GetConnectionString("DefaultConnection")));
+builder.Services.AddIdentityCore<ApplicationUser>(o=>{o.Password.RequiredLength=8;o.User.RequireUniqueEmail=true;}).AddRoles<IdentityRole>().AddEntityFrameworkStores<ProcureFlowDbContext>().AddSignInManager();
+var jwtKey=builder.Configuration["Jwt:Key"] ?? throw new InvalidOperationException("Jwt:Key missing"); builder.Services.AddAuthentication(JwtBearerDefaults.AuthenticationScheme).AddJwtBearer(o=>{o.TokenValidationParameters=new(){ValidateIssuer=true,ValidateAudience=true,ValidateLifetime=true,ValidateIssuerSigningKey=true,ValidIssuer=builder.Configuration["Jwt:Issuer"],ValidAudience=builder.Configuration["Jwt:Audience"],IssuerSigningKey=new SymmetricSecurityKey(Encoding.UTF8.GetBytes(jwtKey))};}); builder.Services.AddAuthorization();
+builder.Services.AddControllers(); builder.Services.AddFluentValidationAutoValidation(); builder.Services.AddValidatorsFromAssemblyContaining<CreatePurchaseRequestValidator>(); builder.Services.AddAutoMapper(typeof(MappingProfile)); builder.Services.AddHttpContextAccessor();
+builder.Services.AddScoped<ICurrentUserService,CurrentUserService>(); builder.Services.AddScoped<IAuthService,AuthService>(); builder.Services.AddScoped<IPurchaseRequestRepository,PurchaseRequestRepository>(); builder.Services.AddScoped<IPurchaseOrderRepository,PurchaseOrderRepository>(); builder.Services.AddScoped<IDeliveryRepository,DeliveryRepository>(); builder.Services.AddScoped<IMasterDataRepository,MasterDataRepository>(); builder.Services.AddScoped<IPurchaseRequestService,PurchaseRequestService>(); builder.Services.AddScoped<IApprovalService,ApprovalService>(); builder.Services.AddScoped<IPurchaseOrderService,PurchaseOrderService>(); builder.Services.AddScoped<IDeliveryService,DeliveryService>(); builder.Services.AddScoped<IDashboardService,DashboardService>(); builder.Services.AddScoped<IMasterDataService,MasterDataService>();
+builder.Services.AddCors(o=>o.AddPolicy("frontend",p=>p.WithOrigins(builder.Configuration["FrontendUrl"] ?? "http://localhost:5173").AllowAnyHeader().AllowAnyMethod()));
+builder.Services.AddEndpointsApiExplorer(); builder.Services.AddSwaggerGen(c=>{c.SwaggerDoc("v1",new(){Title="ProcureFlow API",Version="v1"}); c.AddSecurityDefinition("Bearer",new(){Name="Authorization",Type=SecuritySchemeType.Http,Scheme="bearer",BearerFormat="JWT",In=ParameterLocation.Header}); c.AddSecurityRequirement(new(){[new OpenApiSecurityScheme{Reference=new(){Type=ReferenceType.SecurityScheme,Id="Bearer"}}]=Array.Empty<string>()});});
+var app=builder.Build(); app.UseMiddleware<ExceptionMiddleware>(); if(app.Environment.IsDevelopment()){app.UseSwagger();app.UseSwaggerUI();} app.UseCors("frontend"); app.UseAuthentication(); app.UseAuthorization(); app.MapControllers();
+using(var scope=app.Services.CreateScope()){var db=scope.ServiceProvider.GetRequiredService<ProcureFlowDbContext>(); var um=scope.ServiceProvider.GetRequiredService<UserManager<ApplicationUser>>(); var rm=scope.ServiceProvider.GetRequiredService<RoleManager<IdentityRole>>(); await SeedData.SeedAsync(db,um,rm);} app.Run(); public partial class Program { }

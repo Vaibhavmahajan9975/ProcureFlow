@@ -1,0 +1,4 @@
+import {configureStore,createSlice,PayloadAction} from '@reduxjs/toolkit'; import {setupListeners} from '@reduxjs/toolkit/query'; import {api} from '../api/baseApi'; import type {AuthResponse} from '../types';
+const saved=localStorage.getItem('procureflow_auth'); const initial=saved?JSON.parse(saved):null;
+const authSlice=createSlice({name:'auth',initialState:{user:initial as AuthResponse|null},reducers:{setCredentials:(s,a:PayloadAction<AuthResponse>)=>{s.user=a.payload;localStorage.setItem('procureflow_auth',JSON.stringify(a.payload));},logout:(s)=>{s.user=null;localStorage.removeItem('procureflow_auth');}}});
+export const {setCredentials,logout}=authSlice.actions; export const store=configureStore({reducer:{auth:authSlice.reducer,[api.reducerPath]:api.reducer},middleware:g=>g().concat(api.middleware)}); setupListeners(store.dispatch); export type RootState=ReturnType<typeof store.getState>; export type AppDispatch=typeof store.dispatch;

@@ -1,0 +1,2 @@
+import {Navigate} from 'react-router-dom'; import {useSelector} from 'react-redux'; import type {RootState} from '../app/store'; import type {Role} from '../types';
+export default function ProtectedRoute({children,roles}:{children:React.ReactNode;roles?:Role[]}){const u=useSelector((s:RootState)=>s.auth.user); if(!u)return <Navigate to="/login" replace/>; if(roles && !roles.some(r=>u.roles.includes(r)))return <Navigate to="/" replace/>; return <>{children}</>}
