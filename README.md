@@ -4,7 +4,7 @@ ProcureFlow is a role-based Purchase-to-Pay application covering the workflow fr
 
 ```text
 Draft -> Submitted -> Approved -> PO Created -> Delivered -> Completed
-                     
+
                      -> Rejected
 ```
 
@@ -12,12 +12,12 @@ This is a monorepo containing a React single-page application, a .NET Web API, P
 
 ## Components
 
-| Component | Purpose | Primary technology | Documentation |
-|---|---|---|---|
-| Frontend | Role-aware web interface | React, TypeScript, Vite, Material UI, Redux Toolkit | [frontend/README.md](frontend/README.md) |
-| Backend | Authentication, API, and workflow rules | .NET 8, ASP.NET Core, EF Core, Identity, JWT | [backend/README.md](backend/README.md) |
-| Database | Transactional persistence | PostgreSQL 16 | [backend/README.md](backend/README.md#local-database) |
-| Deployment | Static frontend and hosted API | Azure Static Web Apps and Azure App Service | [Frontend](frontend/README.md#deployment) / [Backend](backend/README.md#cors) |
+| Component  | Purpose                                 | Primary technology                                  | Documentation                                                                 |
+| ---------- | --------------------------------------- | --------------------------------------------------- | ----------------------------------------------------------------------------- |
+| Frontend   | Role-aware web interface                | React, TypeScript, Vite, Material UI, Redux Toolkit | [frontend/README.md](frontend/README.md)                                      |
+| Backend    | Authentication, API, and workflow rules | .NET 8, ASP.NET Core, EF Core, Identity, JWT        | [backend/README.md](backend/README.md)                                        |
+| Database   | Transactional persistence               | PostgreSQL 16                                       | [backend/README.md](backend/README.md#local-database)                         |
+| Deployment | Static frontend and hosted API          | Azure Static Web Apps and Azure App Service         | [Frontend](frontend/README.md#deployment) / [Backend](backend/README.md#cors) |
 
 ## Product capabilities
 
@@ -108,11 +108,11 @@ For database configuration, migrations, CORS, authentication, and API contracts,
 
 Local seed accounts use the password `Demo@123`:
 
-| Email | Role |
-|---|---|
+| Email                        | Role      |
+| ---------------------------- | --------- |
 | `requester@procureflow.demo` | Requester |
-| `approver@procureflow.demo` | Approver |
-| `admin@procureflow.demo` | Admin |
+| `approver@procureflow.demo`  | Approver  |
+| `admin@procureflow.demo`     | Admin     |
 
 Typical flow:
 
@@ -158,6 +158,12 @@ To avoid duplicated and conflicting instructions:
 - This root README contains only the product overview, repository entry point, and cross-component workflow.
 - `backend/README.md` owns backend architecture, database setup, migrations, authentication, API reference, tests, backend decisions, and backend limitations.
 - `frontend/README.md` owns frontend setup, environment variables, routes, state, forms, grids, build/deployment behavior, frontend decisions, and frontend limitations.
+
+## Assessment documents
+
+- [Technical design and implementation documentation](docs/ProcureFlow_Technical_Documentation.docx)
+
+The Word documents include system, architecture, workflow, database, sequence, and deployment diagrams.
 
 ## AI-assisted development disclosure
 
